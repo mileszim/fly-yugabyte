@@ -1,0 +1,46 @@
+app = "fly-yugadb"
+kill_signal = "SIGINT"
+kill_timeout = 5
+processes = []
+
+[build]
+  image="yugabytedb/yugabyte:latest"
+
+[env]
+
+[experimental]
+  auto_rollback = true
+  cmd = ['/usr/bin/bash','-c',' join_ip=$( dig +short aaaa ${FLY_APP_NAME}.internal @fdaa::3 | grep -Ev "$(hostname -i | tr " " "|")" | head -1 | sed -e "s/^/--join /" ) && flags="placement_cloud=fly,placement_region=${FLY_REGION},placement_zone=zone,use_private_ip=cloud" && ulimit -n 1048576 && yugabyted start --listen="$(hostname -i)" --master_flags="$flags" --tserver_flags="ysql_enable_auth=true,$flags" --daemon=false $join_ip ']
+
+[deploy]
+  strategy = "rolling"
+
+[mount]
+  source="yb_data"
+  destination="/root/var/data"
+
+[[services]]
+  http_checks = []
+  internal_port = 27000
+  processes = ["app"]
+  protocol = "tcp"
+  script_checks = []
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+    type = "connections"
+
+  [[services.ports]]
+    force_https = true
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+#  [[services.tcp_checks]]
+#    grace_period = "1s"
+#    interval = "15s"
+#    restart_limit = 0
+#    timeout = "1s"
